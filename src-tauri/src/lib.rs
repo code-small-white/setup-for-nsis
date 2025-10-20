@@ -4,6 +4,7 @@ use std::env;
 use tokio::fs;
 use tokio::process::Command;
 
+
 #[tauri::command]
 fn get_default_install_dir() -> String {
     std::env::var("ProgramFiles(x86)")
@@ -72,14 +73,30 @@ async fn ps_exe(file: String, args: Vec<String>) -> Result<i32, String> {
     run_ps(ps).await
 }
 
+fn get_nsis_log_path() -> PathBuf{
+    let windir = std::env::var("WINDIR").unwrap_or_else(|_| String::from("C:\\Windows"));
+    PathBuf::from(windir).join("Temp").join("modo-nsis.log")
+}
+
 #[tauri::command]
 async fn read_nsis_log() -> Result<String, String> {
-    let windir = std::env::var("WINDIR").unwrap_or_else(|_| String::from("C:\\Windows"));
-    let path = PathBuf::from(windir).join("Temp").join("modo-nsis.log");
-
+    let path=get_nsis_log_path();
     fs::read_to_string(&path)
         .await
         .map_err(|e| format!("read {} failed: {}", path.display(), e))
+}
+
+#[tauri::command]
+async fn delete_nsis_log() -> Result<String, String> {
+    let path=get_nsis_log_path();
+
+    match fs::remove_file(&path).await {
+        Ok(_) => Ok(format!("{} deleted", path.display())),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            Ok(format!("{} not found (already deleted)", path.display()))
+        }
+        Err(e) => Err(format!("delete {} failed: {}", path.display(), e)),
+    }
 }
 
 
@@ -107,7 +124,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![start_cmd,get_default_install_dir,ps_exe,read_nsis_log,check_path_exists,current_exe_path,uninstallexe_replace])
+        .invoke_handler(tauri::generate_handler![start_cmd,get_default_install_dir,ps_exe,read_nsis_log,delete_nsis_log,check_path_exists,current_exe_path,uninstallexe_replace])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

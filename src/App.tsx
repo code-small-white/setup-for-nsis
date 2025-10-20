@@ -45,18 +45,24 @@ function App() {
   }
   const install = async () => {
     console.warn('执行', installDir)
-    installDir && console.warn('执行', installDir)
-    installDir && invoke('ps_exe', { file: setupExe, args: ['/S', `/D="${installDirWithModo}"`] })
+    setStartCmd('安装中。。。')
+    let i = 0
+    if (!installDir) return
+    await invoke('delete_nsis_log').then(console.warn)
+    console.warn('执行', installDir)
+    invoke('ps_exe', { file: setupExe, args: ['/S', `/D="${installDirWithModo}"`] })
     let mainExe = ''
     let uninstallExe = ''
     while (!mainExe) {
       await new Promise<void>(resolve => {
         setTimeout(() => {
+          i++
+          setStartCmd('安装中。。。' + i)
           console.log(installDirWithModo + '\\modo-nsis.log')
           invoke<string>('read_nsis_log').then(log => {
             const logObj = Object.fromEntries(log.split('\r').map(it => it.trim().split('=')))
             console.log(log, logObj)
-            ;({mainExe, uninstallExe} = logObj)
+              ; ({ mainExe, uninstallExe } = logObj)
             console.warn({ mainExe, uninstallExe })
 
             resolve()
@@ -64,6 +70,7 @@ function App() {
         }, 1000);
       })
     }
+    setStartCmd('安装。。。finish')
     console.warn({ mainExe })
     invoke('check_path_exists', { path: [installDirWithModo, `Uninstall ${mainExe}`].join('\\') }).then(res => {
       console.log([installDirWithModo, `Uninstall ${mainExe}`].join('\\'), res);
