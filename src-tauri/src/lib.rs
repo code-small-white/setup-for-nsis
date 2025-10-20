@@ -10,12 +10,13 @@ fn get_default_install_dir() -> String {
         .unwrap_or_else(|_| String::from("C:\\Program Files (x86)"))
 }
 
-async fn gen_uninstallexe_replace_ps(install_dir:String, uninstall_exe_file_name:String,time:String) -> Result<String, String> {
+async fn gen_uninstallexe_replace_ps(install_dir:String, uninstall_exe_file_name:String) -> Result<String, String> {
     let custom_uninstall_exe: PathBuf = env::current_exe().expect("Failed to get current exe path");
 
     // 如果Rename-Item的目标地址已经存在,会报错,不会覆盖,不会阻碍后续行命令执行
+    // TODO真实卸载文件定义一个常量
     let content = format!(r#"
-        Rename-Item '{install_dir}\{uninstall_exe_file_name}' -NewName '{install_dir}\Real {uninstall_exe_file_name}'
+        Rename-Item '{install_dir}\{uninstall_exe_file_name}' -NewName '{install_dir}\Real Uninstall.exe'
         Copy-Item '{custom_uninstall_exe}' '{install_dir}\{uninstall_exe_file_name}'
         "#,install_dir=install_dir,uninstall_exe_file_name=uninstall_exe_file_name,custom_uninstall_exe=custom_uninstall_exe.display());
 
@@ -90,38 +91,23 @@ async fn check_path_exists(path: String) -> (bool, bool) {
 }
 
 #[tauri::command]
-async fn copy_file(src: String, dst: String) -> Result<i32, String> {
-    let ps = format!(
-                r#"$src=\"{s}\";$dst=\"{d}\";$p=Split-Path -Parent $dst; if($p -and !(Test-Path -LiteralPath $p)){{New-Item -ItemType Directory -Path $p -Force|Out-Null}}; Copy-Item -LiteralPath $src -Destination $dst -Force -Verb RunAs -WindowStyle Hidden -PassThru;"#,
-                s=src, d=dst
-            );
-    ps_exe(r"powershell".into(),vec![ps]).await
-}
-
-#[tauri::command]
-async fn rename_if_exists(src: String, dst: String) -> Result<i32, String> {
-    let ps = format!(
-            r#"$src=\"{s}\";$dst=\"{d}\"; if(!(Test-Path -LiteralPath $src)){{exit 10}}; $p=Split-Path -Parent $dst; if($p -and !(Test-Path -LiteralPath $p)){{New-Item -ItemType Directory -Path $p -Force|Out-Null}}; if(Test-Path -LiteralPath $dst){{Remove-Item -LiteralPath $dst -Force}}; Move-Item -LiteralPath $src -Destination $dst -Force -Verb RunAs -WindowStyle Hidden -PassThru;"#,
-            s=src, d=dst
-        );
-    ps_exe(r"powershell".into(),vec![ps]).await
-}
-
-#[tauri::command]
 fn current_exe_path() -> Result<String, String> {
     std::env::current_exe()
         .map(|p| p.display().to_string())
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn start_cmd()->String{
+    std::env::args().collect::<Vec<_>>().join(" ")
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let args: Vec<String> = std::env::args().collect();
-    println!("启动参数: {:?}", args);
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![get_default_install_dir,ps_exe,read_nsis_log,check_path_exists,copy_file,rename_if_exists,current_exe_path,uninstallexe_replace])
+        .invoke_handler(tauri::generate_handler![start_cmd,get_default_install_dir,ps_exe,read_nsis_log,check_path_exists,current_exe_path,uninstallexe_replace])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

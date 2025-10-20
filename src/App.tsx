@@ -10,6 +10,7 @@ let setupExe: string | null
 function App() {
   const [installDir, setInstallDir] = useState('')
   const [currentExePath, setCurrentExePath] = useState('')
+  const [startCmd, setStartCmd] = useState('')
   const installDirWithModo = installDir.endsWith('\\Modo Manager') ? installDir : installDir + '\\Modo Manager'
   console.warn({ installDirWithModo })
 
@@ -17,6 +18,7 @@ function App() {
     getCurrentWindow().show()
     invoke<string>('get_default_install_dir').then(setInstallDir)
     invoke<string>('current_exe_path').then(setCurrentExePath)
+    invoke<string>('start_cmd').then(setStartCmd)
   }, [])
 
   const choosePath = async () => {
@@ -52,9 +54,11 @@ function App() {
         setTimeout(() => {
           console.log(installDirWithModo + '\\modo-nsis.log')
           invoke<string>('read_nsis_log').then(log => {
-            console.log(log)
-            mainExe = log.split('\r').find(it => it.trim().startsWith('mainExe='))?.split('mainExe=').pop() || ''
-            uninstallExe = log.split('\r').find(it => it.trim().startsWith('uninstallExe='))?.split('uninstallExe=').pop() || ''
+            const logObj = Object.fromEntries(log.split('\r').map(it => it.trim().split('=')))
+            console.log(log, logObj)
+            ;({mainExe, uninstallExe} = logObj)
+            console.warn({ mainExe, uninstallExe })
+
             resolve()
           })
         }, 1000);
@@ -68,7 +72,7 @@ function App() {
 
     console.error({ install_dir: installDirWithModo, uninstall_exe_file_name: uninstallExe })
     uninstallexeReplace = () => {
-      invoke('uninstallexe_replace', { installDir: installDirWithModo, uninstallExeFileName: uninstallExe})
+      invoke('uninstallexe_replace', { installDir: installDirWithModo, uninstallExeFileName: uninstallExe })
     }
     uninstallexeReplace()
   }
@@ -82,8 +86,6 @@ function App() {
   }
   const uninstallExe = () => {
     installDir && invoke('ps_exe', { file: setupExe, args: ['/S'] })
-
-
   }
   let uninstallexeReplace = () => {
     console.log('test')
@@ -91,8 +93,9 @@ function App() {
 
   return (
     <main className="container">
-      <h4>{currentExePath}</h4>
-      <h5>{installDirWithModo}</h5>
+      <h4>currentExePath:{currentExePath}</h4>
+      <h4>startCmd:{startCmd}</h4>
+      <h5>installDirWithModo:{installDirWithModo}</h5>
       <button onClick={chooseSetup}>选择setup</button>
       <button onClick={choosePath}>选择安装路径</button>
       <button onClick={install}>安装</button>
