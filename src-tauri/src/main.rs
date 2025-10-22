@@ -31,7 +31,6 @@ fn parse_install_dir(args: Vec<String>) -> String {
 }
 
 //把真实卸载可执行文件复制到当前目录；把启动命令透传到真实卸载可执行文件上
-//E:\code\setup-react\src-tauri\target\debug\setup-react.exe
 fn handle_silent() -> io::Result<()>{
     write_log("handle_silent");
 

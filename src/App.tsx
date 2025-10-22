@@ -4,15 +4,16 @@ import "./App.css";
 import { open } from '@tauri-apps/plugin-dialog';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
-let setupExe: string | null
-
+let mainExe = ''
 
 function App() {
   const [installDir, setInstallDir] = useState('')
   const [currentExePath, setCurrentExePath] = useState('')
   const [startCmd, setStartCmd] = useState('')
+  const [doFinish, setDoFinish] = useState(false)
   const installDirWithModo = installDir.endsWith('\\Modo Manager') ? installDir : installDir + '\\Modo Manager'
   console.warn({ installDirWithModo })
+  const isUninstall = (currentExePath.split('\\').pop() || '').toLowerCase().startsWith('uninstall')
 
   useEffect(() => {
     getCurrentWindow().show()
@@ -33,82 +34,78 @@ function App() {
     // Prints target_dir path and name to the console
   }
 
-  const chooseSetup = async () => {
-    setupExe = await open({
-      multiple: false,
-      directory: false,
-      filters: [{
-        extensions: ['exe'],
-        name: ""
-      }]
-    });
-  }
   const install = async () => {
     console.warn('执行', installDir)
-    setStartCmd('安装中。。。')
+    setStartCmd('提取文件。。。')
     let i = 0
     if (!installDir) return
     await invoke('delete_nsis_log').then(console.warn)
-    console.warn('执行', installDir)
-    invoke('ps_exe', { file: setupExe, args: ['/S', `/D="${installDirWithModo}"`] })
-    let mainExe = ''
+    const t = setInterval(() => {
+      i++
+      setStartCmd('提取文件。。。' + i)
+    }, 990);
+    const setupExe = await invoke('release_main_setup_exe')
+    clearInterval(t)
+
+    console.warn('执行', installDir, { setupExe })
+    invoke('ps_exe', { file: setupExe, hidden: true, args: ['/S', `/D="${installDirWithModo}"`] })
     let uninstallExe = ''
     while (!mainExe) {
+      console.count('while')
       await new Promise<void>(resolve => {
-        setTimeout(() => {
+        setTimeout(async () => {
           i++
           setStartCmd('安装中。。。' + i)
           console.log(installDirWithModo + '\\modo-nsis.log')
-          invoke<string>('read_nsis_log').then(log => {
+          await invoke<string>('read_nsis_log').then(log => {
             const logObj = Object.fromEntries(log.split('\r').map(it => it.trim().split('=')))
             console.log(log, logObj)
               ; ({ mainExe, uninstallExe } = logObj)
             console.warn({ mainExe, uninstallExe })
 
-            resolve()
-          })
+          }).catch(e => console.warn(e))
+            .finally(resolve)
         }, 1000);
       })
     }
-    setStartCmd('安装。。。finish')
+    // TODO 清理临时文件
     console.warn({ mainExe })
     invoke('check_path_exists', { path: [installDirWithModo, `Uninstall ${mainExe}`].join('\\') }).then(res => {
       console.log([installDirWithModo, `Uninstall ${mainExe}`].join('\\'), res);
-
     })
 
     console.error({ install_dir: installDirWithModo, uninstall_exe_file_name: uninstallExe })
-    uninstallexeReplace = () => {
-      invoke('uninstallexe_replace', { installDir: installDirWithModo, uninstallExeFileName: uninstallExe })
-    }
-    uninstallexeReplace()
+    await invoke('uninstallexe_replace', { installDir: installDirWithModo, uninstallExeFileName: uninstallExe })
+    setStartCmd('安装。。。finish')
+    
+    setDoFinish(true)
   }
 
   const startExe = () => {
-    invoke<string>('read_nsis_log').then(log => {
-      const mainExe = log.split('\r').find(it => it.trim().startsWith('mainExe='))?.split('mainExe=').pop()
-      invoke('ps_exe', { file: [installDirWithModo, mainExe].join("\\"), args: [] })
-    })
+    console.warn({ mainExe }, 'starexe', [installDirWithModo, mainExe].join("\\"))
+    mainExe && invoke('ps_exe', { file: [installDirWithModo, mainExe].join("\\"), hidden: false, args: [] })
+  }
 
-  }
   const uninstallExe = () => {
-    installDir && invoke('ps_exe', { file: setupExe, args: ['/S'] })
+    const setupExe = currentExePath.split('\\')
+    setupExe.splice(-1, 1, 'Real Uninstall.exe')
+    console.log(setupExe.join('\\'))
+    invoke('ps_exe', { file: setupExe, hidden: true, args: ['/S'] })
   }
-  let uninstallexeReplace = () => {
-    console.log('test')
-  }
+
 
   return (
     <main className="container">
       <h4>currentExePath:{currentExePath}</h4>
       <h4>startCmd:{startCmd}</h4>
-      <h5>installDirWithModo:{installDirWithModo}</h5>
-      <button onClick={chooseSetup}>选择setup</button>
-      <button onClick={choosePath}>选择安装路径</button>
-      <button onClick={install}>安装</button>
-      <button onClick={startExe}>启动</button>
-      <button onClick={uninstallExe}>卸载</button>
-      <button onClick={uninstallexeReplace}>ce测试替换</button>
+      {isUninstall ?
+        <button onClick={uninstallExe}>卸载</button> :
+        <>
+          <h5>installDirWithModo:{installDirWithModo}</h5>
+          <button onClick={choosePath}>选择安装路径</button>
+          <button onClick={install}>安装</button>
+          {doFinish && <button onClick={startExe}>启动</button>}
+        </>}
     </main>
   );
 }
