@@ -47,14 +47,19 @@ async fn run_ps(ps: String, hidden: bool) -> Result<i32, String> {
     println!("PowerShell command:\n{}", ps);
 
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    let mut args = vec!["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", &ps];
+    let args = vec![
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-WindowStyle",
+        "Hidden",
+        "-Command",
+        &ps,
+    ];
 
     // 在开头插入 "2" 和 "3"
     let mut cmd = Command::new("powershell");
-    if hidden {
-        cmd.creation_flags(CREATE_NO_WINDOW);
-        args.splice(0..0, ["-WindowStyle", "Hidden"].iter().cloned());
-    }
+    hidden.then(|| cmd.creation_flags(CREATE_NO_WINDOW));
     cmd.args(args);
     let s = cmd.status().await.map_err(|e| e.to_string())?;
     Ok(s.code().unwrap_or(-1))
