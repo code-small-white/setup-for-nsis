@@ -3,6 +3,10 @@ Var LOG_FILE
 Var LOG_HANDLE
 Var LOG_IS_OPEN
 
+; 指定使用 Unicode
+Unicode true
+
+
 ; ===== 日志宏：初始化(清空)、继续写、结束(关闭) =====
 ; 初始化：清空并打开（保持打开）
 !macro LOG_BEGIN

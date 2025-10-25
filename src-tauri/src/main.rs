@@ -57,7 +57,8 @@ fn handle_silent() -> io::Result<()>{
     Command::new(&args[0])
         .args(&args[1..])      
         .creation_flags(CREATE_NO_WINDOW);
-    std::process::exit(0);
+    // std::process::exit(0);
+    Ok(())
 }
 
 
