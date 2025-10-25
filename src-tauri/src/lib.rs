@@ -43,7 +43,7 @@ async fn gen_uninstallexe_replace_ps(
         .map_err(|_| "文件路径包含非 UTF‑8 字符".to_string())
 }
 
-async fn run_ps(ps: String, hidden: bool) -> Result<i32, String> {
+async fn run_ps(ps: String) -> Result<i32, String> {
     println!("PowerShell command:\n{}", ps);
 
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -58,11 +58,23 @@ async fn run_ps(ps: String, hidden: bool) -> Result<i32, String> {
     ];
 
     // 在开头插入 "2" 和 "3"
-    let mut cmd = Command::new("powershell");
-    hidden.then(|| cmd.creation_flags(CREATE_NO_WINDOW));
-    cmd.args(args);
-    let s = cmd.status().await.map_err(|e| e.to_string())?;
-    Ok(s.code().unwrap_or(-1))
+    let res = Command::new("powershell")
+        .args(args)
+        .creation_flags(CREATE_NO_WINDOW)
+        .status()
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(res.code().unwrap_or(-1))
+}
+
+#[tauri::command]
+async fn run_exe(path: String) {
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+    Command::new(path)
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .unwrap();
 }
 
 #[tauri::command]
@@ -71,7 +83,7 @@ async fn uninstallexe_replace(
     uninstall_exe_file_name: String,
 ) -> Result<i32, String> {
     let ps_path = gen_uninstallexe_replace_ps(install_dir, uninstall_exe_file_name).await?;
-    ps_exe(r"powershell".into(), true, vec![ps_path]).await
+    ps_exe(r"powershell".into(), vec![ps_path]).await
 }
 
 #[tauri::command]
@@ -100,7 +112,7 @@ async fn release_main_setup_exe() -> Result<PathBuf, String> {
 }
 
 #[tauri::command]
-async fn ps_exe(file: String, hidden: bool, args: Vec<String>) -> Result<i32, String> {
+async fn ps_exe(file: String, args: Vec<String>) -> Result<i32, String> {
     let arglist = args
         .iter()
         .map(|a| a.replace("'", "\\\'")) // 转义引号
@@ -114,14 +126,13 @@ async fn ps_exe(file: String, hidden: bool, args: Vec<String>) -> Result<i32, St
 
     // PowerShell 提权命令：RunAs 管理员、隐藏窗口、等待退出
     let ps = format!(
-        "$p = Start-Process -FilePath '{}' {} -Verb RunAs {} -PassThru; \
+        "$p = Start-Process -FilePath '{}' {} -Verb RunAs -WindowStyle Hidden -PassThru; \
          $p.WaitForExit(); exit $p.ExitCode",
         file.replace('\'', "''"),
-        argfrag,
-        if hidden { "-WindowStyle Hidden" } else { "" }
+        argfrag
     );
 
-    run_ps(ps, hidden).await
+    run_ps(ps).await
 }
 
 fn get_nsis_log_path() -> PathBuf {
@@ -175,6 +186,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
+            run_exe,
             release_main_setup_exe,
             start_cmd,
             get_default_install_dir,

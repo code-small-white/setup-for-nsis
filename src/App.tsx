@@ -48,7 +48,7 @@ function App() {
     clearInterval(t)
 
     console.warn('执行', installDir, { setupExe })
-    invoke('ps_exe', { file: setupExe, hidden: true, args: ['/S', `/D="${installDirWithModo}"`] })
+    invoke('ps_exe', { file: setupExe, args: ['/S', `/D="${installDirWithModo}"`] })
     let uninstallExe = ''
     while (!mainExe) {
       console.count('while')
@@ -83,14 +83,14 @@ function App() {
 
   const startExe = () => {
     console.warn({ mainExe }, 'starexe', [installDirWithModo, mainExe].join("\\"))
-    mainExe && invoke('ps_exe', { file: [installDirWithModo, mainExe].join("\\"), hidden: false, args: [] })
+    mainExe && invoke('run_exe', { path: [installDirWithModo, mainExe].join("\\") })
   }
 
   const uninstallExe = () => {
     const setupExe = currentExePath.split('\\')
     setupExe.splice(-1, 1, 'Real Uninstall.exe')
     console.log(setupExe.join('\\'))
-    invoke('ps_exe', { file: setupExe, hidden: true, args: ['/S'] })
+    invoke('ps_exe', { file: setupExe, args: ['/S'] })
   }
 
 
