@@ -39,7 +39,10 @@ function App() {
     setStartCmd('提取文件。。。')
     let i = 0
     if (!installDir) return
-    await invoke('delete_nsis_log').then(console.warn)
+    mainExe = ''
+    const logPath = `${installDirWithModo}.${isUninstall ? 'uninstall' : 'install'}.nsis.log`
+
+    await invoke('reset_file', { path: logPath }).then(console.warn)
     const t = setInterval(() => {
       i++
       setStartCmd('提取文件。。。' + i)
@@ -57,7 +60,7 @@ function App() {
           i++
           setStartCmd('安装中。。。' + i)
           console.log(installDirWithModo + '\\modo-nsis.log')
-          await invoke<string>('read_nsis_log').then(log => {
+          await invoke<string>('read_nsis_log', { path: logPath }).then(log => {
             const logObj = Object.fromEntries(log.split('\r').map(it => it.trim().split('=')))
             console.log(log, logObj)
               ; ({ mainExe, uninstallExe } = logObj)
@@ -77,7 +80,7 @@ function App() {
     console.error({ install_dir: installDirWithModo, uninstall_exe_file_name: uninstallExe })
     await invoke('uninstallexe_replace', { installDir: installDirWithModo, uninstallExeFileName: uninstallExe })
     setStartCmd('安装。。。finish')
-    
+
     setDoFinish(true)
   }
 

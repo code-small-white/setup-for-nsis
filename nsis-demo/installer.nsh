@@ -9,9 +9,9 @@ Unicode true
 
 ; ===== 日志宏：初始化(清空)、继续写、结束(关闭) =====
 ; 初始化：清空并打开（保持打开）
-!macro LOG_BEGIN
-  StrCpy $LOG_FILE "$WINDIR\Temp\modo-nsis.log"
-  FileOpen $LOG_HANDLE "$LOG_FILE" w
+!macro LOG_BEGIN FLAG
+  StrCpy $LOG_FILE "$INSTDIR.${FLAG}.nsis.log"
+  FileOpen $LOG_HANDLE "$LOG_FILE" a
   StrCpy $LOG_IS_OPEN 1
 !macroend
 
@@ -33,13 +33,13 @@ Unicode true
 
 ; ========== 你的钩子，改为使用以上日志宏 ==========
 
-;!macro customHeader
-;  CRCCheck off
-;!macroend
+!macro customHeader
+  CRCCheck off
+!macroend
 
 !macro customInit
   ; 初始化时清空并打开
-  !insertmacro LOG_BEGIN
+  !insertmacro LOG_BEGIN install
   !insertmacro LOG_WRITE "init" "初始化安装器..."
 !macroend
 
@@ -64,7 +64,7 @@ Function .onInstFailed
 FunctionEnd
 
 !macro customUnInit
-  !insertmacro LOG_BEGIN
+  !insertmacro LOG_BEGIN uninstall
   !insertmacro LOG_WRITE "uninstallStart" "true"
 !macroend
 
@@ -72,7 +72,7 @@ FunctionEnd
 ; 卸载流程：单独的日志文件
 !macro customUnInstall
   ; 初始化卸载日志（清空并打开）
-  !insertmacro LOG_BEGIN
+  !insertmacro LOG_BEGIN uninstall
   !insertmacro LOG_WRITE "uninstalling" "true"
 !macroend
 

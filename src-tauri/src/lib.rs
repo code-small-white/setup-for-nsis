@@ -3,7 +3,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use tokio::fs;
 use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process::Command;
 
 static MAIN_SETUP_EXE: &[u8] = include_bytes!("../../nsis-demo/dist/minimal-repro Setup 1.0.0.exe");
@@ -11,6 +11,52 @@ static MAIN_SETUP_EXE: &[u8] = include_bytes!("../../nsis-demo/dist/minimal-repr
 #[tauri::command]
 fn get_default_install_dir() -> String {
     std::env::var("ProgramFiles(x86)").unwrap_or_else(|_| String::from("C:\\Program Files (x86)"))
+}
+
+async fn gen_logfile_create_ps(log_path: &str) -> Result<String, String> {
+    let content = r#"
+    # 功能: 创建文件 → 隐藏 → Everyone 可读
+    # ===============================
+
+    # 目标文件路径（可修改）
+    $filePath = "FILEPATH"
+
+
+    "initFile=true" | Set-Content -Path $filePath -Encoding UTF8
+
+    # 2️⃣ 设置文件为隐藏
+    # 添加 Hidden 属性
+    $attr = (Get-Item $filePath).Attributes
+    if (-not ($attr -band [System.IO.FileAttributes]::Hidden)) {
+        Set-ItemProperty -Path $filePath -Name Attributes -Value ($attr -bor [System.IO.FileAttributes]::Hidden)
+    }
+
+    # 3️⃣ 设置 Everyone 只读权限
+    # 先获取现有 ACL
+    $acl = Get-Acl $filePath
+    $rule = New-Object System.Security.AccessControl.FileSystemAccessRule("Everyone", "Read", "Allow")
+    # 拒绝写入
+    $denyWriteRule = New-Object System.Security.AccessControl.FileSystemAccessRule("Everyone", "Write", "Deny")
+
+    # 添加规则
+    $acl.SetAccessRule($rule)
+    #$acl.SetAccessRule($denyWriteRule)
+    Set-Acl $filePath $acl
+
+    Write-Host "✅ 文件创建并设置完成：$filePath"
+
+        "#.replace("\"FILEPATH\"", &format!("\"{}\"", log_path));
+
+    let mut path: PathBuf = env::temp_dir();
+    path.push("logfile_create.ps1");
+
+    fs::write(&path, content.as_bytes())
+        .await
+        .map_err(|e| format!("写入文件 {:?} 失败: {}", path, e))?;
+
+    path.into_os_string()
+        .into_string()
+        .map_err(|_| "文件路径包含非 UTF‑8 字符".to_string())
 }
 
 async fn gen_uninstallexe_replace_ps(
@@ -135,30 +181,33 @@ async fn ps_exe(file: String, args: Vec<String>) -> Result<i32, String> {
     run_ps(ps).await
 }
 
-fn get_nsis_log_path() -> PathBuf {
-    let windir = std::env::var("WINDIR").unwrap_or_else(|_| String::from("C:\\Windows"));
-    PathBuf::from(windir).join("Temp").join("modo-nsis.log")
-}
-
 #[tauri::command]
-async fn read_nsis_log() -> Result<String, String> {
-    let path = get_nsis_log_path();
-    fs::read_to_string(&path)
-        .await
-        .map_err(|e| format!("read {} failed: {}", path.display(), e))
-}
+async fn read_nsis_log(path: String) -> Result<String, String> {
+    // 异步打开文件
+    let mut file = match File::open(path).await {
+        Ok(file) => file,
+        Err(_) => return Err("文件打开失败".to_string()), // 返回错误信息
+    };
 
-#[tauri::command]
-async fn delete_nsis_log() -> Result<String, String> {
-    let path = get_nsis_log_path();
+    // 创建一个向量来存储文件内容
+    let mut buffer = Vec::new();
 
-    match fs::remove_file(&path).await {
-        Ok(_) => Ok(format!("{} deleted", path.display())),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            Ok(format!("{} not found (already deleted)", path.display()))
-        }
-        Err(e) => Err(format!("delete {} failed: {}", path.display(), e)),
+    // 异步读取文件内容
+    if let Err(_) = file.read_to_end(&mut buffer).await {
+        return Err("文件读取失败".to_string());
     }
+    // 强制将字节数据转换为 UTF-8 字符串，忽略无效字符
+    let utf8_string = String::from_utf8_lossy(&buffer);
+
+    // 返回文件内容（即使有乱码）
+    Ok(utf8_string.to_string())
+}
+
+#[tauri::command]
+async fn reset_file(path: String) -> Result<(), String> {
+    let ps_path = gen_logfile_create_ps(&path).await?;
+    let _ = ps_exe(r"powershell".into(), vec!["-File".to_string(), ps_path]).await;
+    Ok(())
 }
 
 #[tauri::command]
@@ -192,7 +241,7 @@ pub fn run() {
             get_default_install_dir,
             ps_exe,
             read_nsis_log,
-            delete_nsis_log,
+            reset_file,
             check_path_exists,
             current_exe_path,
             uninstallexe_replace
