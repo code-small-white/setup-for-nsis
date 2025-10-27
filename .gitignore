@@ -24,3 +24,4 @@ dist-ssr
 *.sw?
 src-tauri/resources/main-setup.exe
 dist/minimal-repro Setup 1.0.0.exe
+target/rust-analyzer
