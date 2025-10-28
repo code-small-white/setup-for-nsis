@@ -62,32 +62,8 @@ fn handle_silent() -> io::Result<()>{
     Ok(())
 }
 
-fn hide_console_window() {
-    // 直接使用 WinAPI（无第三方依赖）
-    type HWND = *mut core::ffi::c_void;
-
-    extern "system" {
-        fn GetConsoleWindow() -> HWND;
-        fn ShowWindow(hWnd: HWND, nCmdShow: i32) -> i32;
-        // fn FreeConsole() -> i32;
-    }
-
-    const SW_HIDE: i32 = 0;
-
-    unsafe {
-        let hwnd = GetConsoleWindow();
-        if !hwnd.is_null() {
-            // 先隐藏窗口，再释放控制台
-            ShowWindow(hwnd, SW_HIDE);
-        }
-    }
-}
-
-
-
 fn main() {
     if is_silent_mode() {
-        // hide_console_window();
         write_log("静默启动");
         let _ = handle_silent();
         return;
