@@ -6,6 +6,8 @@ use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process::Command;
 
+// TODO怎么动态这个路径:方案=>外部配置这个路径,=>用[内部/外部]脚本把变量地址改为写死的固定地址
+// 可以约定一个位置在配置文件{}
 static MAIN_SETUP_EXE: &[u8] = include_bytes!("../../nsis-demo/dist/minimal-repro Setup 1.0.0.exe");
 
 #[tauri::command]
