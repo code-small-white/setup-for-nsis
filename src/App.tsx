@@ -11,9 +11,11 @@ function App() {
   const [currentExePath, setCurrentExePath] = useState('')
   const [startCmd, setStartCmd] = useState('')
   const [doFinish, setDoFinish] = useState(false)
+  const [unFinish, setUnFinish] = useState(false)
   const installDirWithModo = installDir.endsWith('\\Modo Manager') ? installDir : installDir + '\\Modo Manager'
   console.warn({ installDirWithModo })
   const isUninstall = (currentExePath.split('\\').pop() || '').toLowerCase().startsWith('uninstall')
+  const logPath = `${installDirWithModo}.${isUninstall ? 'uninstall' : 'install'}.nsis.log`
 
   useEffect(() => {
     getCurrentWindow().show()
@@ -34,13 +36,13 @@ function App() {
     // Prints target_dir path and name to the console
   }
 
+
   const install = async () => {
     console.warn('执行', installDir)
     setStartCmd('提取文件。。。')
     let i = 0
     if (!installDir) return
     mainExe = ''
-    const logPath = `${installDirWithModo}.${isUninstall ? 'uninstall' : 'install'}.nsis.log`
 
     await invoke('reset_file', { path: logPath }).then(console.warn)
     const t = setInterval(() => {
@@ -89,13 +91,34 @@ function App() {
     mainExe && invoke('run_exe', { path: [installDirWithModo, mainExe].join("\\") })
   }
 
-  const uninstallExe = () => {
+  const uninstallExe = async () => {
     const setupExe = currentExePath.split('\\')
     setupExe.splice(-1, 1, 'Real Uninstall.exe')
     console.log(setupExe.join('\\'))
-    invoke('ps_exe', { file: setupExe, args: ['/S'] })
+    const file = setupExe.join('\\')
+    invoke('ps_exe', { file, args: ['/S'] })
+    let i = 0
+    let res = false
+    while (!res) {
+      console.count('while')
+      await new Promise<void>(resolve => {
+        setTimeout(async () => {
+          i++
+          setStartCmd('卸载。。。' + i)
+          console.log(installDirWithModo + '\\modo-nsis.log')
+          await invoke<string>('check_path_exists', { path: file }).then(log => {
+            console.warn({ log })
+            !log && (setUnFinish(true), res = true)
+          }).catch(e => console.warn(e))
+            .finally(resolve)
+        }, 1000);
+      })
+    }
   }
 
+  const clearSelf = () => {
+    invoke('uninstall_self_after_exit')
+  }
 
   return (
     <main className="container">
@@ -109,6 +132,8 @@ function App() {
           <button onClick={install}>安装</button>
           {doFinish && <button onClick={startExe}>启动</button>}
         </>}
+      {unFinish && <button onClick={clearSelf}>卸载完成</button>}
+      <button onClick={clearSelf}>测试卸载完成</button>
     </main>
   );
 }

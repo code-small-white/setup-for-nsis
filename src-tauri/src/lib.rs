@@ -213,10 +213,15 @@ async fn reset_file(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn check_path_exists(path: String) -> (bool, bool) {
-    // 返回 (是否存在, 是否是目录)
+async fn check_path_exists(path: String) -> bool {
     let p = Path::new(&path);
-    (p.exists(), p.is_dir())
+    p.exists()
+}
+
+#[tauri::command]
+async fn path_is_dir(path: String) -> bool {
+    let p = Path::new(&path);
+    p.is_dir()
 }
 
 #[tauri::command]
@@ -229,6 +234,14 @@ fn current_exe_path() -> Result<String, String> {
 #[tauri::command]
 fn start_cmd() -> String {
     std::env::args().collect::<Vec<_>>().join(" ")
+}
+
+#[tauri::command]
+fn uninstall_self_after_exit() -> Result<(), String> {
+    Ok(())
+    // std::process::exit(0);
+    // Ok(())
+    // 由调用者在外层尽快退出进程，释放句柄
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -245,8 +258,10 @@ pub fn run() {
             read_nsis_log,
             reset_file,
             check_path_exists,
+            path_is_dir,
             current_exe_path,
-            uninstallexe_replace
+            uninstallexe_replace,
+            uninstall_self_after_exit
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
