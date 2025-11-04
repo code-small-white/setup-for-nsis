@@ -35,9 +35,6 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": [
-      "resources/main-setup.exe"
-    ],
     "windows": {
       "allowDowngrades": true,
       "certificateThumbprint": null,

@@ -6,9 +6,7 @@ use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process::Command;
 
-// TODO怎么动态这个路径:方案=>外部配置这个路径,=>用[内部/外部]脚本把变量地址改为写死的固定地址
-// 可以约定一个位置在配置文件{}
-static MAIN_SETUP_EXE: &[u8] = include_bytes!("../../nsis-demo/dist/minimal-repro Setup 1.0.0.exe");
+static MAIN_SETUP_EXE: &[u8] = include_bytes!("../resources/setup.exe");
 
 #[tauri::command]
 fn get_default_install_dir() -> String {
@@ -116,13 +114,18 @@ async fn run_ps(ps: String) -> Result<i32, String> {
 }
 
 #[tauri::command]
-async fn run_exe(path: String) {
+async fn start_main_exe(app: tauri::AppHandle, path: String) {
     const CREATE_NO_WINDOW: u32 = 0x08000000;
-
-    Command::new(path)
+    Command::new("powershell")
         .creation_flags(CREATE_NO_WINDOW)
+        .args([
+            "-NoProfile",
+            "-Command",
+            &format!(r#"Start-Process -FilePath '{}' -WindowStyle Normal"#, path),
+        ])
         .spawn()
         .unwrap();
+    app.exit(0);
 }
 
 #[tauri::command]
@@ -237,10 +240,35 @@ fn start_cmd() -> String {
 }
 
 #[tauri::command]
-fn uninstall_self_after_exit() -> Result<(), String> {
-    Ok(())
-    // std::process::exit(0);
+fn uninstall_self_after_exit(app: tauri::AppHandle) -> Result<(), String> {
+    let exe_path = env::current_exe().unwrap();
+    let parent_pid = std::process::id();
+
+    let script = format!(
+        r#"
+        $p = Get-Process -Id '{}' -ErrorAction SilentlyContinue
+        if ($p) {{
+            # 等待主进程退出（阻塞，不循环）
+            $p.WaitForExit()
+        }}
+        #Start-Sleep -Seconds 1
+        Remove-Item '{}' -Force
+        "#,
+        parent_pid,
+        exe_path.display()
+    );
+
+    // 启动 PowerShell 进程来执行脚本
+    Command::new("powershell")
+        .arg("-Command")
+        .arg(script)
+        .creation_flags(0x00000200 | 0x08000000) // CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS
+        .spawn()
+        .expect("Failed to start the process");
     // Ok(())
+    // std::process::exit(0);
+    app.exit(0);
+    Ok(())
     // 由调用者在外层尽快退出进程，释放句柄
 }
 
@@ -250,7 +278,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
-            run_exe,
+            start_main_exe,
             release_main_setup_exe,
             start_cmd,
             get_default_install_dir,

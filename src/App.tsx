@@ -88,7 +88,7 @@ function App() {
 
   const startExe = () => {
     console.warn({ mainExe }, 'starexe', [installDirWithModo, mainExe].join("\\"))
-    mainExe && invoke('run_exe', { path: [installDirWithModo, mainExe].join("\\") })
+    mainExe && invoke('start_main_exe', { path: [installDirWithModo, mainExe].join("\\") })
   }
 
   const uninstallExe = async () => {
@@ -133,7 +133,7 @@ function App() {
           {doFinish && <button onClick={startExe}>启动</button>}
         </>}
       {unFinish && <button onClick={clearSelf}>卸载完成</button>}
-      <button onClick={clearSelf}>测试卸载完成</button>
+      {/* <button onClick={clearSelf}>测试卸载完成</button> */}
     </main>
   );
 }
