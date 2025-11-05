@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-const fs = require('fs');
-const path = require('path');
 import { execSync } from 'child_process';
+import fs from 'fs';
+import path from 'path';
 
 // 1. 获取当前工作目录
 const currentDir = process.cwd();

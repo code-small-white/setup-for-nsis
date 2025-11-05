@@ -45,10 +45,15 @@ function App() {
     mainExe = ''
 
     await invoke('reset_file', { path: logPath }).then(console.warn)
+    await invoke<string>('read_nsis_log', { path: logPath }).then(log => {
+      const logObj = Object.fromEntries(log.split('\r').map(it => it.trim().split('=')))
+      console.warn('q清理之后',log, logObj)
+
+    }).catch(e => console.warn(e))
     const t = setInterval(() => {
       i++
       setStartCmd('提取文件。。。' + i)
-    }, 990);
+    }, 390);
     const setupExe = await invoke('release_main_setup_exe')
     clearInterval(t)
 

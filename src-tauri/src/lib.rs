@@ -17,6 +17,7 @@ async fn gen_logfile_create_ps(log_path: &str) -> Result<String, String> {
     let content = r#"
     # 功能: 创建文件 → 隐藏 → Everyone 可读
     # ===============================
+    Remove-Item -Path "FILEPATH" -Force -ErrorAction SilentlyContinue
 
     # 目标文件路径（可修改）
     $filePath = "FILEPATH"
